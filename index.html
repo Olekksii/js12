@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Застосунок для вивчення мови</title>
+    <link rel="icon" href="image/icon.png" type="image/png">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-image: url("image/fon.jpg");
+        }
+        .app-container {
+            text-align: center;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        #word-card {
+            margin-bottom: 50px;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        #translation-input {
+            width: 90%;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #difficulty-selection {
+            margin-bottom: 20px;
+        }
+        #statistics {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .modal-content button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .modal-content button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="difficulty-selection">
+            <h3>Виберіть рівень складності:</h3>
+            <select id="difficulty-select">
+                <option value="easy">Початковий</option>
+                <option value="medium">Середній</option>
+                <option value="hard">Високий</option>
+            </select>
+        </div>
+        <div id="card-container">
+            <div id="word-card">
+                <p id="word">always</p>
+            </div>
+            <div id="progress">
+                <span id="current-step">1</span>/<span id="total-steps">10</span>
+            </div>
+            <input type="text" id="translation-input" placeholder="Введіть переклад">
+            <button id="check-button">Перевірити</button>
+        </div>
+        <div id="statistics">
+            <p>Правильно: <span id="correct-count">0</span></p>
+            <p>Неправильно: <span id="incorrect-count">0</span></p>
+        </div>
+    </div>
+
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <h2>Рівень знань мови</h2>
+            <p id="level-text"></p>
+            <button id="close-modal">Закрити</button>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            const words = {
+                easy: [
+                    { word: "read", translation: "читати" },
+                    { word: "rock", translation: "скеля" },
+                    { word: "ocean", translation: "океан" },
+					{ word: "flower", translation: "квітка" },
+					{ word: "forest", translation: "ліс" },
+                    { word: "city", translation: "місто" },
+                    { word: "world", translation: "світ" },
+					{ word: "animal", translation: "тварина" },
+					{ word: "night", translation: "ніч" },
+					{ word: "fire", translation: "вогонь" },
+                ],
+                medium: [
+                    { word: "prompt", translation: "підказка" },
+                    { word: "worksheet", translation: "таблиця" },
+                    { word: "stewardship", translation: "управління" },
+					{ word: "estimating", translation: "оцінка" },
+                    { word: "inquiry", translation: "запит" },
+                    { word: "graduate", translation: "випускник" },
+					{ word: "credential", translation: "диплом" },
+                    { word: "workforce", translation: "робоча сила" },
+                    { word: "volunteering", translation: "волонтерство" },
+					{ word: "incursion", translation: "вторгнення" }
+                ],
+                hard: [
+                    { word: "similarity", translation: "подібність" },
+                    { word: "modality", translation: "спосіб" },
+                    { word: "exhibition", translation: "виставка" },
+                    { word: "cognition", translation: "пізнання" },
+					{ word: "conjecture", translation: "здогадка" },
+                    { word: "assertion", translation: "твердження" },
+                    { word: "gist", translation: "суть" },
+                    { word: "likelihood", translation: "ймовірність" },
+					{ word: "vindication", translation: "обґрунтування" },
+                    { word: "discerning", translation: "розбірливість" } 
+                ]
+            };
+
+            let currentIndex = 0;
+            let correctCount = 0;
+            let incorrectCount = 0;
+            let selectedLevel = 'easy'; 
+
+            $('#difficulty-select').change(function() {
+                selectedLevel = $(this).val();
+                currentIndex = 0;
+                correctCount = 0;
+                incorrectCount = 0;
+                $('#correct-count').text(correctCount);
+                $('#incorrect-count').text(incorrectCount);
+                startTest();
+            });
+
+            function startTest() {
+                const shuffledWords = words[selectedLevel].sort(() => Math.random() - 0.5);
+                updateCard(shuffledWords);
+            }
+
+            function updateCard(words) {
+                $('#word').text(words[currentIndex].word);
+                $('#current-step').text(currentIndex + 1);
+                $('#total-steps').text(words.length);
+            }
+
+            function calculateLevel() {
+                const percentage = (correctCount / words[selectedLevel].length) * 100;
+                let level = '';
+
+                if (percentage === 100) {
+                    level = 'Ваш рівень C1!';
+                } else if (percentage >= 80) {
+                    level = 'Ваш рівень B1!';
+                } else if (percentage >= 60) {
+                    level = 'Ваш рівень A2.';
+                } else if (percentage >= 40) {
+                    level = 'Ваш рівень A1.';
+                } else {
+                    level = 'Потрібно більше практики.';
+                }
+
+                $('#level-text').text(level);
+            }
+
+            $('#check-button').click(function() {
+                const userTranslation = $('#translation-input').val().trim();
+                if (userTranslation === "") {
+                    alert("Будь ласка, введіть переклад!");
+                    return;
+                }
+
+                const wordsArray = words[selectedLevel];
+                if (userTranslation === wordsArray[currentIndex].translation) {
+                    correctCount++;
+                    $('#correct-count').text(correctCount);
+                } else {
+                    incorrectCount++;
+                    $('#incorrect-count').text(incorrectCount);
+                }
+
+                currentIndex++;
+                $('#translation-input').val("");
+
+                if (currentIndex < wordsArray.length) {
+                    updateCard(wordsArray);
+                } else {
+                    calculateLevel();
+                    $('#result-modal').show();
+                }
+            });
+
+            $('#close-modal').click(function() {
+                $('#result-modal').hide();
+                location.reload();
+            });
+
+            startTest(); 
+        });
+    </script>
+</body>
+</html>
